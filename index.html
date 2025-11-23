@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Nakshatra Portfolio | Bright Intelligence</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;700;900&family=Source+Code+Pro:wght@400;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --bg-main: #f8fafc;
+            --text-main: #0f172a;
+            --primary-bright: #3b82f6;
+            --secondary-bright: #ec4899;
+            --glass-bright: rgba(255, 255, 255, 0.6);
+        }
+        body, html {
+            margin: 0; padding: 0;
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            font-family: 'Outfit', sans-serif;
+            overflow-x: hidden;
+        }
+        /* FIXED: Background now always visible */
+        .ultimate-bg {
+            position: fixed !important;
+            inset: 0 !important;
+            pointer-events: none !important;
+            z-index: -10 !important;   /* Was -4, now behind everything */
+            overflow: hidden;
+        }
+        .orb { position: absolute; border-radius: 50%; filter: blur(100px); animation: pulse 16s infinite alternate ease-in-out; }
+        .orb-1 { width: 720px; height: 720px; top: -160px; left: -160px; background: radial-gradient(circle at 30% 30%, #3b82f6, transparent 70%); opacity: 0.5; }
+        .orb-2 { width: 820px; height: 820px; bottom: -220px; right: -220px; background: radial-gradient(circle, #ec4899 20%, transparent 60%); opacity: 0.45; animation-delay: 5s; }
+        .floaty-shape { position: absolute; font-size: 4rem; opacity: 0.16; animation: float 24s infinite linear; filter: blur(1px); }
+        .morph-blob { position: absolute; border-radius: 50%; filter: blur(90px) url(#gooey); opacity: 0.38; animation: morph 22s infinite ease-in-out; }
+
+        @keyframes pulse { 0% { transform: scale(0.9); opacity: 0.4; } 100% { transform: scale(1.25); opacity: 0.7; } }
+        @keyframes float { 0% { transform: translateY(100vh) rotate(0deg); } 100% { transform: translateY(-120px) translateX(100px) rotate(360deg); } }
+        @keyframes morph {
+            0%,100% { border-radius: 40% 60% 60% 40% / 60% 40% 60% 40%; transform: translate(0,0) scale(1); }
+            50% { border-radius: 60% 40% 40% 60% / 40% 60% 40% 60%; transform: translate(60px,-60px) scale(1.2); }
+        }
+
+        /* Canvases behind content but in front of ultimate-bg */
+        #webgl-container, #circuit-canvas, #cursor-trail {
+            position: fixed !important;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .glass-card-bright { background: var(--glass-bright); backdrop-filter: blur(12px) saturate(150%); border: 1px solid rgba(255,255,255,0.8); box-shadow: 0 8px 32px 0 rgba(31,38,135,0.07); border-radius: 24px; position: relative; overflow: hidden; }
+        .glass-card-bright::after { content: ""; position: absolute; inset: -160%; background: conic-gradient(from 0deg, transparent 0%, rgba(59,130,246,0.12) 12%, rgba(236,72,153,0.10) 28%, transparent 45%); animation: card-spin 8s linear infinite; z-index: 0; }
+        @keyframes card-spin { 100% { transform: rotate(360deg); } }
+
+        .gradient-text-bright { background: linear-gradient(135deg, var(--primary-bright), var(--secondary-bright)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: inline-block; }
+        .code-font { font-family: 'Source Code Pro', monospace; }
+
+        /* Marquee */
+        .marquee-wrapper { display: flex; width: 200%; animation: marquee 38s linear infinite; }
+        .marquee-wrapper:hover { animation-play-state: paused; }
+        @keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+
+        /* Responsive fix - background always visible */
+        @media (max-width: 900px) {
+            h1 { font-size: 3.6rem !important; line-height: 1.1; }
+            .orb { filter: blur(130px); opacity: 0.4; }
+            .morph-blob { opacity: 0.25; }
+            .floaty-shape { display: none; }
+        }
+    </style>
+</head>
+<body class="relative">
+
+    <!-- ULTIMATE BACKGROUND LAYER -->
+    <div class="ultimate-bg">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="floaty-shape" style="top:10%;left:12%;color:#3b82f6;">Triangle</div>
+        <div class="floaty-shape" style="top:65%;left:75%;color:#ec4899;font-size:4.8rem;animation-delay:5s;">Diamond</div>
+        <div class="floaty-shape" style="top:32%;left:55%;color:#8b5cf6;animation-delay:10s;">Star</div>
+        <div class="floaty-shape" style="top:85%;left:18%;color:#06b6d4;animation-delay:15s;">Square</div>
+        <div class="morph-blob" style="width:540px;height:540px;top:15%;left:8%;background:#8b5cf6;"></div>
+        <div class="morph-blob" style="width:600px;height:600px;bottom:10%;right:10%;background:#ec4899;animation-delay:8s;"></div>
+        <div class="morph-blob" style="width:480px;height:480px;top:50%;left:50%;transform:translate(-50%,-50%);background:#3b82f6;animation-delay:16s;"></div>
+    </div>
+
+    <!-- CANVASES -->
+    <div id="webgl-container" aria-hidden="true">
+        <canvas id="three-canvas" class="bg-canvas"></canvas>
+        <canvas id="circuit-canvas" class="bg-canvas"></canvas>
+    </div>
+    <svg width="0" height="0" style="position:absolute">
+      <filter id="gooey">
+        <feGaussianBlur in="SourceGraphic" stdDeviation="15" result="blur"/>
+        <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -7" result="gooey"/>
+        <feBlend in="SourceGraphic" in2="gooey"/>
+      </filter>
+    </svg>
+    <canvas id="cursor-trail"></canvas>
+
+    <!-- NAV -->
+    <nav id="navbar" class="fixed top-0 w-full z-50 py-4">
+        <div class="container mx-auto px-6 flex justify-between items-center">
+            <div class="text-2xl font-black tracking-tighter flex items-center gap-2">
+                <span class="text-blue-600 text-3xl">Nakshatra</span> DL_Architect
+            </div>
+            <div class="hidden md:flex space-x-8 font-semibold text-sm text-slate-600">
+                <a href="#home" class="hover:text-blue-600 transition relative group">Home<span class="absolute -bottom-1 left-0 w-0 h-0.5 bg-blue-600 transition-all group-hover:w-full"></span></a>
+                <a href="#about" class="hover:text-blue-600 transition relative group">About<span class="absolute -bottom-1 left-0 w-0 h-0.5 bg-blue-600 transition-all group-hover:w-full"></span></a>
+                <a href="#projects" class="hover:text-blue-600 transition relative group">Work<span class="absolute -bottom-1 left-0 w-0 h-0.5 bg-blue-600 transition-all group-hover:w-full"></span></a>
+                <a href="#contact" class="hover:text-blue-600 transition relative group">Contact<span class="absolute -bottom-1 left-0 w-0 h-0.5 bg-blue-600 transition-all group-hover:w-full"></span></a>
+            </div>
+        </div>
+    </nav>
+
+
+    <!-- HERO -->
+    <section id="home" class="min-h-screen flex items-center justify-center relative pt-20">
+        <div class="container mx-auto px-6 text-center z-10 flex flex-col items-center">
+            <div class="gsap-fade-down inline-block px-4 py-2 rounded-full bg-blue-100 text-blue-700 font-bold text-sm mb-6 shadow-sm border border-blue-200">
+                <span class="flex items-center gap-2">
+                    <span class="animate-ping absolute inline-flex h-3 w-3 rounded-full bg-blue-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
+                    Neural Networks Active
+                </span>
+            </div>
+            <h1 class="text-7xl md:text-9xl font-black mb-4 leading-none tracking-tight reveal-text-container">
+                <div class="reveal-text text-slate-800"><span>DESIGNING</span></div>
+                <div class="reveal-text gradient-text-bright"><span>INTELLIGENCE.</span></div>
+            </h1>
+            <p class="gsap-fade-up text-slate-500 text-xl md:text-2xl max-w-2xl mx-auto mb-12 font-light leading-relaxed">
+                Deep Learning Engineer specializing in generative models and high-dimensional data manifolds.
+            </p>
+            <div class="gsap-fade-up" data-tilt data-tilt-scale="1.1" data-tilt-glare data-tilt-max-glare="0.5">
+                <a href="#projects" class="px-8 py-4 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition shadow-lg shadow-blue-600/30 flex items-center gap-2 mx-auto">
+                    Explore Projects →
+                </a>
+            </div>
+        </div>
+    </section>
+    
+        <!-- ABOUT SECTION -->
+    <section id="about" class="py-32 relative z-10">
+        <div class="container mx-auto px-6 text-center">
+            <h2 class="text-5xl font-black text-slate-800 mb-12 gsap-title">About <span class="gradient-text-bright">Me</span></h2>
+            <p class="text-slate-500 text-lg max-w-3xl mx-auto mb-6 leading-relaxed gsap-fade-up">
+                Hi, I’m Nakshatra, a Computer Science student at Delhi Technological University (DTU).
+            </p>
+            <p class="text-slate-500 text-lg max-w-3xl mx-auto mb-6 leading-relaxed gsap-fade-up">
+                I’m passionate about Deep Learning and exploring the vast world of artificial intelligence.
+                I love building models that can see, understand, and predict the world around us.
+            </p>
+            <p class="text-slate-500 text-lg max-w-3xl mx-auto mb-6 leading-relaxed gsap-fade-up">
+                From image classification to NLP projects, I enjoy experimenting with cutting-edge AI techniques.
+                I’m constantly learning and staying up-to-date with the latest research and technologies.
+            </p>
+            <p class="text-slate-500 text-lg max-w-3xl mx-auto mb-6 leading-relaxed gsap-fade-up">
+                Problem-solving and coding are my playgrounds—I thrive on turning ideas into real-world applications.
+                I’m also keen on contributing to open-source projects and collaborating with like-minded innovators.
+            </p>
+            <p class="text-slate-500 text-lg max-w-3xl mx-auto leading-relaxed gsap-fade-up">
+                In the future, I aim to create AI systems that can transform industries and make an impact.
+            </p>
+        </div>
+    </section>
+
+  
+
+      <!-- PROJECTS -->
+    <section id="projects" class="py-32 relative z-10">
+        <div class="container mx-auto px-6">
+            <div class="mb-20 text-center">
+                <h2 class="text-5xl font-black text-slate-800 mb-4 gsap-title">Featured <span class="text-blue-600">Projects</span></h2>
+                <p class="text-slate-500 text-lg max-w-xl mx-auto">Pushing the boundaries of what tensors can create.</p>
+            </div>
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div class="glass-card-bright p-8 cursor-pointer gsap-card" data-tilt data-tilt-glare data-tilt-max-glare="0.4" data-tilt-scale="1.05">
+                    <div class="h-48 rounded-2xl bg-gradient-to-tr from-blue-100 to-cyan-50 mb-6 flex items-center justify-center overflow-hidden relative">
+                        <div class="absolute inset-0 bg-[url('https://source.unsplash.com/random/400x400/?robot')] bg-cover bg-center opacity-20 mix-blend-overlay transition-transform duration-500 hover:scale-110"></div>
+                        <span class="text-6xl">Image</span>
+                    </div>
+                    <div class="code-font text-blue-600 text-sm mb-2 font-bold">Image Compression</div>
+                    <h3 class="text-2xl font-bold text-slate-800 mb-3">Compressing of Image</h3>
+                    <p class="text-slate-500 mb-6 leading-relaxed">Reduces image colors by clustering pixels, representing each cluster with its centroid to shrink file size while preserving quality.</p>
+                    <div class="flex flex-wrap gap-2"> <!-- Removed mb-6 here -->
+                        <span class="px-3 py-1 bg-blue-50 text-blue-600 text-xs font-bold rounded-full border border-blue-100">PIL</span>
+                        <span class="px-3 py-1 bg-slate-50 text-slate-600 text-xs font-bold rounded-full border border-slate-100">Scikit-Learn</span>
+                    </div>
+                    <!-- GitHub Link for Image Compression - REMOVED -->
+                </div>
+                <div class="glass-card-bright p-8 cursor-pointer gsap-card" data-tilt data-tilt-glare data-tilt-max-glare="0.4" data-tilt-scale="1.05">
+                    <div class="h-48 rounded-2xl bg-gradient-to-tr from-pink-100 to-purple-50 mb-6 flex items-center justify-center overflow-hidden relative">
+                        <div class="absolute inset-0 bg-[url('https://source.unsplash.com/random/400x400/?abstract')] bg-cover bg-center opacity-20 mix-blend-overlay transition-transform duration-500 hover:scale-110"></div>
+                        <span class="text-6xl">Few-Shot</span>
+                    </div>
+                    <div class="code-font text-pink-600 text-sm mb-2 font-bold">Few-Shot Learning</div>
+                    <h3 class="text-2xl font-bold text-slate-800 mb-3">Prototypical Networks</h3>
+                    <p class="text-slate-500 mb-6 leading-relaxed">Few-shot learning model that represents each class by the mean of its support examples (prototype) and classifies queries based on distance to these prototypes.</p>
+                    <div class="flex flex-wrap gap-2"> <!-- Removed mb-6 here -->
+                        <span class="px-3 py-1 bg-pink-50 text-pink-600 text-xs font-bold rounded-full border border-pink-100">Pytorch</span>
+                    </div>
+                    <!-- GitHub Link for Few-Shot Learning - REMOVED -->
+                </div>
+                <div class="glass-card-bright p-8 cursor-pointer gsap-card" data-tilt data-tilt-glare data-tilt-max-glare="0.4" data-tilt-scale=\"1.05\">
+                    <div class="h-48 rounded-2xl bg-gradient-to-tr from-yellow-100 to-orange-50 mb-6 flex items-center justify-center overflow-hidden relative">
+                        <div class="absolute inset-0 bg-[url('https://source.unsplash.com/random/400x400/?data')] bg-cover bg-center opacity-20 mix-blend-overlay transition-transform duration-500 hover:scale-110"></div>
+                        <span class="text-6xl">NLP</span>
+                    </div>
+                    <div class="code-font text-orange-600 text-sm mb-2 font-bold">NLP & LLMs</div>
+                    <h3 class="text-2xl font-bold text-slate-800 mb-3">GPT-2 Architecture</h3>
+                    <p class="text-slate-500 mb-6 leading-relaxed">Transformer-based language model with stacked decoder blocks, using self-attention and feed-forward layers to generate coherent text autoregressively.</p>
+                    <div class="flex flex-wrap gap-2"> <!-- Removed mb-6 here -->
+                        <span class="px-3 py-1 bg-orange-50 text-orange-600 text-xs font-bold rounded-full border border-orange-100">Pytorch</span>
+                    </div>
+                    <!-- GitHub Link for GPT-2 Architecture - REMOVED -->
+                </div>
+            </div>
+        </div>
+        <br>
+        <div class="container mx-auto px-6">
+           
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div class="glass-card-bright p-8 cursor-pointer gsap-card" data-tilt data-tilt-glare data-tilt-max-glare="0.4" data-tilt-scale="1.05">
+                    <div class="h-48 rounded-2xl bg-gradient-to-tr from-blue-100 to-cyan-50 mb-6 flex items-center justify-center overflow-hidden relative">
+                        <div class="absolute inset-0 bg-[url('https://source.unsplash.com/random/400x400/?robot')] bg-cover bg-center opacity-20 mix-blend-overlay transition-transform duration-500 hover:scale-110"></div>
+                        <span class="text-6xl">ViT</span>
+                    </div>
+                    <div class="code-font text-blue-600 text-sm mb-2 font-bold">Vision-Transformer</div>
+                    <h3 class="text-2xl font-bold text-slate-800 mb-3">Classification of Images</h3>
+                    <p class="text-slate-500 mb-6 leading-relaxed">A neural network architecture that applies the transformer model—originally designed for language—to image data by splitting images into patches and processing them as a sequence, achieving strong performance on image recognition tasks.</p>
+                    <div class="flex flex-wrap gap-2"> <!-- Removed mb-6 here -->
+                        <span class="px-3 py-1 bg-blue-50 text-blue-600 text-xs font-bold rounded-full border border-blue-100">PyTorch</span>
+                        <span class="px-3 py-1 bg-slate-50 text-slate-600 text-xs font-bold rounded-full border border-slate-100">ViT</span>
+                    </div>
+                    <!-- GitHub Link for Vision-Transformer - REMOVED -->
+                </div>
+                <div class="glass-card-bright p-8 cursor-pointer gsap-card" data-tilt data-tilt-glare data-tilt-max-glare="0.4" data-tilt-scale="1.05">
+                    <div class="h-48 rounded-2xl bg-gradient-to-tr from-pink-100 to-purple-50 mb-6 flex items-center justify-center overflow-hidden relative">
+                        <div class="absolute inset-0 bg-[url('https://source.unsplash.com/random/400x400/?abstract')] bg-cover bg-center opacity-20 mix-blend-overlay transition-transform duration-500 hover:scale-110"></div>
+                        <span class="text-6xl">Continual Learning</span>
+                    </div>
+                    <div class="code-font text-pink-600 text-sm mb-2 font-bold">Continual Learning</div>
+                    <h3 class="text-2xl font-bold text-slate-800 mb-3">Forgetting to forget</h3>
+                    <p class="text-slate-500 mb-6 leading-relaxed">Training a model to learn new tasks over time without forgetting previously learned knowledge.</p>
+                    <div class="flex flex-wrap gap-2"> <!-- Removed mb-6 here -->
+                        <span class="px-3 py-1 bg-pink-50 text-pink-600 text-xs font-bold rounded-full border border-pink-100">PyTorch</span>
+                    </div>
+                    <!-- GitHub Link for Continual Learning - REMOVED -->
+                </div>
+                <div class="glass-card-bright p-8 cursor-pointer gsap-card" data-tilt data-tilt-glare data-tilt-max-glare="0.4" data-tilt-scale="1.05">
+                    <div class="h-48 rounded-2xl bg-gradient-to-tr from-yellow-100 to-orange-50 mb-6 flex items-center justify-center overflow-hidden relative">
+                        <div class="absolute inset-0 bg-[url('https://source.unsplash.com/random/400x400/?data')] bg-cover bg-center opacity-20 mix-blend-overlay transition-transform duration-500 hover:scale-110"></div>
+                        <span class="text-6xl">Speech</span>
+                    </div>
+                    <div class="code-font text-orange-600 text-sm mb-2 font-bold">NLP & LLMs</div>
+                    <h3 class="text-2xl font-bold text-slate-800 mb-3">Jamba</h3>
+                    <p class="text-slate-500 mb-6 leading-relaxed">Jamba LLM: A large language model designed for fast, context-aware, and domain-specific text generation.</p>
+                    <div class="flex flex-wrap gap-2"> <!-- Removed mb-6 here -->
+                        <span class="px-3 py-1 bg-orange-50 text-orange-600 text-xs font-bold rounded-full border border-orange-100">Pytorch</span>
+                    </div>
+                    <!-- GitHub Link for Jamba - REMOVED -->
+                </div>
+            </div>
+        </div>
+
+        <!-- New "View All Codes" Button -->
+        <div class="text-center mt-20">
+            <a href="https://github.com/Nakshatra1729yuvi" target="_blank" rel="noopener"
+               class="inline-flex items-center justify-center px-8 py-4 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition shadow-lg shadow-blue-600/30 gap-2">
+                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.418 2.865 8.18 6.839 9.504.47.087.686-.208.686-.467 0-.232-.008-.849-.013-1.673-2.782.602-3.369-1.34-3.369-1.34-.454-1.154-1.11-1.463-1.11-1.463-.909-.62.069-.608.069-.608 1.007.07 1.532 1.03 1.532 1.03.892 1.529 2.341 1.089 2.91.833.091-.647.35-1.089.636-1.338-2.22-.253-4.555-1.113-4.555-4.953 0-1.096.39-1.992 1.029-2.694-.103-.253-.446-1.273.098-2.65 0 0 .84-.27 2.75 1.025A9.564 9.564 0 0112 6.844c.85.004 1.701.11 2.503.324 1.909-1.295 2.747-1.025 2.747-1.025.546 1.377.202 2.397.099 2.65.64.702 1.028 1.598 1.028 2.694 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .26.216.559.691.467C20.137 20.19 23 16.427 23 12.017 23 6.484 18.522 2 12 2z" clip-rule="evenodd" />
+                </svg>
+                View All Codes
+            </a>
+        </div>
+    </section>
+
+
+    <!-- CONTACT SECTION - NOW 100% VISIBLE & ANIMATED -->
+    <section id="contact" class="py-32 relative z-10 bg-gradient-to-b from-transparent via-white/40 to-white/70 backdrop-blur-sm">
+        <div class="container mx-auto px-6 text-center">
+            <h2 class="text-5xl md:text-6xl font-black text-slate-800 mb-6">
+                Get in <span class="gradient-text-bright">Touch</span>
+            </h2>
+            <p class="text-slate-600 text-lg max-w-2xl mx-auto mb-16">
+                I'm always open to discussing new projects, creative ideas, or opportunities to be part of your visions.
+            </p>
+            <div class="flex flex-col md:flex-row justify-center items-center gap-10 text-lg font-medium">
+    
+    <!-- EMAIL - Official Gmail/Envelope Style -->
+    <a href="mailto:nakshatrayadav@1729@gmail.com" 
+       class="gsap-contact flex items-center gap-5 text-slate-700 hover:text-red-600 transition-all duration-300 transform hover:scale-110 group">
+        
+        <div class="relative">
+            <div class="absolute inset-0 bg-red-500 rounded-2xl blur-xl opacity-0 group-hover:opacity-40 transition-opacity duration-500"></div>
+            <div class="relative p-4 bg-red-50 rounded-2xl border-2 border-red-200">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8m-18 0a2 2 0 012-2h14a2 2 0 012 2m-18 0v10a2 2 0 002 2h14a2 2 0 002-2V8" />
+                </svg>
+            </div>
+        </div>
+        <span class="font-bold">Email</span>
+    </a>
+
+    <!-- LINKEDIN - Official LinkedIn Blue -->
+    <a href="https://www.linkedin.com/in/nakshatra-yadav/" target="_blank" rel="noopener"
+       class="gsap-contact flex items-center gap-5 text-slate-700 hover:text-[#0077b5] transition-all duration-300 transform hover:scale-110 group">
+        
+        <div class="relative">
+            <div class="absolute inset-0 bg-[#0077b5] rounded-2xl blur-xl opacity-0 group-hover:opacity-40 transition-opacity duration-500"></div>
+            <div class="relative p-4 bg-[#0077b5]/10 rounded-2xl border-2 border-[#0077b5]/30">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-[#0077b5]" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M19.959 11.719v7.642h-4.408v-7.112c0-1.789-.64-3.009-2.239-3.009-1.22 0-1.946.82-2.264 1.614-.116.285-.145.682-.145 1.081v7.426H6.493s.058-12.059 0-13.302h4.41v1.883c.584-.902 1.631-2.184 3.971-2.184 2.9 0 5.085 1.896 5.085 5.972zM2.977 5.456C1.648 5.456.5 4.304.5 2.928c0-1.376 1.148-2.492 2.477-2.492 1.329 0 2.418 1.116 2.418 2.492 0 1.376-1.089 2.528-2.418 2.528zM.5 21.36h4.973V8.058H.5v13.302z"/>
+                </svg>
+            </div>
+        </div>
+        <span class="font-bold">LinkedIn</span>
+    </a>
+
+    <!-- GITHUB - Official GitHub Dark -->
+    <a href="https://github.com/Nakshatra1729yuvi" target="_blank" rel="noopener"
+       class="gsap-contact flex items-center gap-5 text-slate-700 hover:text-[#333] transition-all duration-300 transform hover:scale-110 group">
+        
+        <div class="relative">
+            <div class="absolute inset-0 bg-black rounded-2xl blur-xl opacity-0 group-hover:opacity-40 transition-opacity duration-500"></div>
+            <div class="relative p-4 bg-black/10 rounded-2xl border-2 border-black/20">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-black" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
+                </svg>
+            </div>
+        </div>
+        <span class="font-bold">GitHub</span>
+    </a>
+
+</div>
+        </div>
+    </section>
+    
+    <!-- LIBRARIES -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/TextPlugin.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vanilla-tilt/1.8.0/vanilla-tilt.min.js"></script>
+
+    <script>
+    /* ===========================================================
+       Helper: clamp + random helpers
+       =========================================================== */
+    function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+    function rand(min, max) { return Math.random() * (max - min) + min; }
+
+    /* ===========================================================
+       1) THREE.JS: neural particles + wireframe torus (three-canvas)
+       =========================================================== */
+    (function initThree() {
+        const canvas = document.getElementById('three-canvas');
+        canvas.style.zIndex = -3;
+        const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xf8fafc);
+        scene.fog = new THREE.FogExp2(0xf8fafc, 0.002);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
+        camera.position.z = 120;
+
+        // Particles
+        const particleCount = 180;
+        const positions = new Float32Array(particleCount * 3);
+        const velocities = new Array(particleCount);
+        for (let i = 0; i < particleCount; i++) {
+            positions[i*3] = rand(-140, 140);
+            positions[i*3+1] = rand(-100, 100);
+            positions[i*3+2] = rand(-120, 120);
+            velocities[i] = { x: rand(-0.12,0.12), y: rand(-0.12,0.12), z: rand(-0.12,0.12) };
+        }
+        const particlesGeo = new THREE.BufferGeometry();
+        particlesGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        const particleMat = new THREE.PointsMaterial({
+            color: 0x3b82f6,
+            size: 2.6,
+            transparent: true,
+            opacity: 0.85,
+            map: new THREE.TextureLoader().load('https://threejs.org/examples/textures/sprites/disc.png'),
+            alphaTest: 0.4,
+            depthWrite: false
+        });
+        const particleSystem = new THREE.Points(particlesGeo, particleMat);
+        scene.add(particleSystem);
+
+        // Connections (LineSegments)
+        const maxConnections = 360; // limit connections
+        let lineMesh = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0xec4899, transparent: true, opacity: 0.12 }));
+        scene.add(lineMesh);
+
+        // Floating wireframe torus (neural manifold)
+        const torus = new THREE.Mesh(
+            new THREE.TorusGeometry(48, 14, 16, 100),
+            new THREE.MeshBasicMaterial({ color: 0x3b82f6, wireframe: true, opacity: 0.18, transparent: true })
+        );
+        torus.position.z = -40;
+        scene.add(torus);
+
+        // Light subtle ambient
+        const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambient);
+
+        // animation
+        let cameraAngle = 0;
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const posArr = particlesGeo.attributes.position.array;
+            // update positions
+            for (let i = 0; i < particleCount; i++) {
+                posArr[i*3] += velocities[i].x;
+                posArr[i*3+1] += velocities[i].y;
+                posArr[i*3+2] += velocities[i].z;
+
+                // bounds reflect
+                if (Math.abs(posArr[i*3]) > 160) velocities[i].x *= -1;
+                if (Math.abs(posArr[i*3+1]) > 120) velocities[i].y *= -1;
+                if (Math.abs(posArr[i*3+2]) > 140) velocities[i].z *= -1;
+            }
+            particlesGeo.attributes.position.needsUpdate = true;
+
+            // build connections array (limited)
+            const linePositions = new Float32Array(maxConnections * 2 * 3); // (pairs) * coords
+            let lp = 0, connected = 0;
+            for (let i = 0; i < particleCount && connected < maxConnections; i++) {
+                for (let j = i+1; j < particleCount && connected < maxConnections; j++) {
+                    const dx = posArr[i*3] - posArr[j*3];
+                    const dy = posArr[i*3+1] - posArr[j*3+1];
+                    const dz = posArr[i*3+2] - posArr[j*3+2];
+                    const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+                    if (dist < 40) {
+                        linePositions[lp++] = posArr[i*3];
+                        linePositions[lp++] = posArr[i*3+1];
+                        linePositions[lp++] = posArr[i*3+2];
+                        linePositions[lp++] = posArr[j*3];
+                        linePositions[lp++] = posArr[j*3+1];
+                        linePositions[lp++] = posArr[j*3+2];
+                        connected++;
+                    }
+                }
+            }
+            // update geometry buffer size exactly used
+            lineMesh.geometry.dispose();
+            const used = lp;
+            if (used > 0) {
+                const trimmed = new Float32Array(linePositions.buffer.slice(0, used * 4)); // careful slice
+                // simpler: create new Float32Array and copy used items:
+                const copy = new Float32Array(used);
+                for (let i=0;i<used;i++) copy[i]=linePositions[i];
+                const lg = new THREE.BufferGeometry();
+                lg.setAttribute('position', new THREE.BufferAttribute(copy, 3));
+                lineMesh.geometry = lg;
+            } else {
+                lineMesh.geometry = new THREE.BufferGeometry();
+            }
+
+            // rotate systems subtly
+            particleSystem.rotation.y += 0.001;
+            lineMesh.rotation.y += 0.0012;
+            torus.rotation.x += 0.002;
+            torus.rotation.y += 0.003;
+
+            // camera subtle orbit
+            cameraAngle += 0.0006;
+            const orbitRadius = 10;
+            const zoomAmount = 6;
+            camera.position.x = Math.sin(cameraAngle) * orbitRadius;
+            camera.position.y = Math.cos(cameraAngle*0.7) * orbitRadius * 0.5;
+            camera.position.z = 120 + Math.sin(cameraAngle*0.5) * zoomAmount;
+            camera.lookAt(0,0,0);
+
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // handle resize
+        window.addEventListener('resize', () => {
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+        });
+    })();
+
+    /* ===========================================================
+       2) Circuit board canvas: procedural traces + traveling pulses
+       (drawn on circuit-canvas)
+       =========================================================== */
+    (function initCircuit() {
+        const canvas = document.getElementById('circuit-canvas');
+        canvas.width = innerWidth;
+        canvas.height = innerHeight;
+        canvas.style.zIndex = -2;
+        const ctx = canvas.getContext('2d');
+
+        let traces = []; // each trace is {a:{x,y}, b:{x,y}, phase}\
+        const cols = Math.floor(innerWidth/90);
+        const rows = Math.floor(innerHeight/90);
+
+        function generateTraces() {
+            traces = [];
+            // grid of nodes
+            const nodes = [];
+            const paddingX = innerWidth / (cols+1);
+            const paddingY = innerHeight / (rows+1);
+            for (let i=1;i<=cols;i++){
+                for (let j=1;j<=rows;j++){
+                    nodes.push({ x: i*paddingX + rand(-20,20), y: j*paddingY + rand(-20,20) });
+                }
+            }
+            // connect near neighbors randomly (emulates PCB)
+            for (let i=0;i<nodes.length;i++){
+                for (let j=i+1;j<nodes.length;j++){
+                    const dx = nodes[i].x - nodes[j].x;
+                    const dy = nodes[i].y - nodes[j].y;
+                    const d = Math.sqrt(dx*dx + dy*dy);
+                    if (d < 160 && Math.random() < 0.25) {
+                        traces.push({ a: nodes[i], b: nodes[j], phase: Math.random()*Math.PI*2, width: rand(0.6,1.6) });
+                    }
+                }
+            }
+            // add some long bus traces
+            for (let k=0;k<10;k++){
+                const a = nodes[Math.floor(Math.random()*nodes.length)];
+                const b = nodes[Math.floor(Math.random()*nodes.length)];
+                if (a && b) traces.push({ a, b, phase: Math.random()*Math.PI*2, width: rand(1.2,2.6) });
+            }
+        }
+        generateTraces();
+
+        // pulse objects traveling along traces
+        const pulses = [];
+        function spawnPulse() {
+            if (traces.length === 0) return;
+            const t = traces[Math.floor(Math.random()*traces.length)];
+            pulses.push({ trace: t, t: 0, speed: rand(0.008, 0.02), hue: rand(180,300) });
+        }
+
+        // spawn pulses periodically
+        setInterval(spawnPulse, 350);
+
+        function draw() {
+            ctx.clearRect(0,0,canvas.width,canvas.height);
+            // subtle background grid lines to read as PCB
+            ctx.save();
+            ctx.globalAlpha = 0.03;
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 1;
+            for (let x=0;x<canvas.width;x+=40){
+                ctx.beginPath();
+                ctx.moveTo(x,0); ctx.lineTo(x,canvas.height); ctx.stroke();
+            }
+            for (let y=0;y<canvas.height;y+=40){
+                ctx.beginPath();
+                ctx.moveTo(0,y); ctx.lineTo(canvas.width,y); ctx.stroke();
+            }
+            ctx.restore();
+
+            // draw traces
+            for (let tr of traces) {
+                ctx.beginPath();
+                // slight bezier for smoother traces
+                const mx = (tr.a.x + tr.b.x)/2 + Math.sin(tr.phase + performance.now()*0.0003) * 8;
+                const my = (tr.a.y + tr.b.y)/2 + Math.cos(tr.phase + performance.now()*0.0004) * 8;
+                ctx.moveTo(tr.a.x, tr.a.y);
+                ctx.quadraticCurveTo(mx, my, tr.b.x, tr.b.y);
+                ctx.strokeStyle = 'rgba(236,72,153,0.07)'; // subtle magenta
+                ctx.lineWidth = tr.width;
+                ctx.stroke();
+
+                // inner bright line to give neon trace
+                ctx.beginPath();
+                ctx.moveTo(tr.a.x, tr.a.y);
+                ctx.quadraticCurveTo(mx, my, tr.b.x, tr.b.y);
+                ctx.strokeStyle = 'rgba(59,130,246,0.14)';
+                ctx.lineWidth = tr.width*0.5;
+                ctx.stroke();
+            }
+
+            // update and draw pulses
+            for (let i=pulses.length-1;i>=0;i--){
+                const p = pulses[i];
+                p.t += p.speed;
+                if (p.t > 1.04) { pulses.splice(i,1); continue; }
+                // compute point on quadratic curve
+                const ax = p.trace.a.x, ay = p.trace.a.y;
+                const bx = p.trace.b.x, by = p.trace.b.y;
+                const mx = (ax + bx)/2 + Math.sin(p.trace.phase + performance.now()*0.0003) * 8;
+                const my = (ay + by)/2 + Math.cos(p.trace.phase + performance.now()*0.0004) * 8;
+                // quadratic interpolate
+                const t = clamp(p.t, 0, 1);
+                const x = (1-t)*(1-t)*ax + 2*(1-t)*t*mx + t*t*bx;
+                const y = (1-t)*(1-t)*ay + 2*(1-t)*t*my + t*t*by;
+                // draw pulse
+                const grad = ctx.createRadialGradient(x, y, 0, x, y, 18);
+                grad.addColorStop(0, `hsla(${p.hue},90%,60%,0.95)`);
+                grad.addColorStop(0.25, `hsla(${p.hue},85%,60%,0.35)`);
+                grad.addColorStop(1, `hsla(${p.hue},85%,60%,0)`);
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.arc(x,y,10,0,Math.PI*2);
+                ctx.fill();
+                // small core
+                ctx.beginPath();
+                ctx.fillStyle = 'white';
+                ctx.arc(x,y,1.2,0,Math.PI*2);
+                ctx.fill();
+            }
+
+            requestAnimationFrame(draw);
+        }
+        draw();
+
+        // regenerate on resize
+        window.addEventListener('resize', () => {
+            canvas.width = innerWidth;
+            canvas.height = innerHeight;
+            generateTraces();
+        });
+    })();
+
+    /* ===========================================================
+       3) Cursor trail neon particles (cursor-trail canvas)
+       =========================================================== */
+    (function initCursorTrail(){
+        const canvas = document.getElementById('cursor-trail');
+        const ctx = canvas.getContext('2d');
+        let w = canvas.width = innerWidth;
+        let h = canvas.height = innerHeight;
+        const particles = [];
+        function resize(){ w = canvas.width = innerWidth; h = canvas.height = innerHeight; }
+        window.addEventListener('resize', resize);
+
+        window.addEventListener('mousemove', (e) => {
+            for (let i = 0; i < 4; i++) {
+                particles.push({
+                    x: e.clientX + rand(-6,6),
+                    y: e.clientY + rand(-6,6),
+                    vx: rand(-1.2,1.2),
+                    vy: rand(-1.2,1.2),
+                    life: rand(14,30),
+                    size: rand(2.2,5.6),
+                    hue: Math.floor(rand(200,300))
+                });
+            }
+        });
+
+        function loop(){
+            ctx.clearRect(0,0,w,h);
+            for (let i = particles.length-1; i>=0; i--){
+                const p = particles[i];
+                p.x += p.vx; p.y += p.vy; p.life -= 1;
+                ctx.beginPath();
+                ctx.fillStyle = `hsla(${p.hue},95%,60%,${(p.life/30)})`;
+                ctx.arc(p.x,p.y,p.size,0,Math.PI*2);
+                ctx.fill();
+                if (p.life <= 0) particles.splice(i,1);
+            }
+            requestAnimationFrame(loop);
+        }
+        loop();
+    })();
+
+    /* ===========================================================
+       4) VanillaTilt init + extra GSAP soft physics bounce for cards
+       =========================================================== */
+    (function initTiltAndBounce(){
+        // tilt init
+        VanillaTilt.init(document.querySelectorAll("[data-tilt]"), {
+            max: 12,
+            speed: 500,
+            glare: true,
+            "max-glare": 0.35,
+            scale: 1.02
+        });
+
+        // GSAP bounce on hover for .gsap-card
+        document.querySelectorAll(".gsap-card").forEach(card => {
+            card.addEventListener("mouseenter", () => {
+                gsap.to(card, { y: -8, duration: 0.45, ease: "elastic.out(1, 0.45)" });
+            });
+            card.addEventListener("mouseleave", () => {
+                gsap.to(card, { y: 0, duration: 0.6, ease: "elastic.out(1, 0.5)" });
+            });
+        });
+    })();
+
+    /* ===========================================================
+       5) GSAP animations and scroll triggers (your original logic)
+       =========================================================== */
+    (function initGSAP(){
+        gsap.registerPlugin(ScrollTrigger, TextPlugin);
+
+        // Reveal text - apply class to animate with CSS transform to avoid jank
+        const revealItems = document.querySelectorAll('.reveal-text');
+        setTimeout(()=> {
+            revealItems.forEach(r => r.classList.add('revealed'));
+        }, 250);
+
+        const tl = gsap.timeline();
+        tl.from(".gsap-fade-down", { y: -50, opacity: 0, duration: 0.8, ease: "back.out(1.7)" })
+        .from(".gsap-fade-up", { y: 30, opacity: 0, stagger: 0.16, duration: 0.8 }, "-=0.6");
+
+        gsap.from(".gsap-title", {
+            scrollTrigger: { trigger: ".gsap-title", start: "top 80%" },
+            y: 50, opacity: 0, duration: 1, ease: "power3.out"
+        });
+
+        gsap.from(".gsap-card", {
+            scrollTrigger: { trigger: "#projects", start: "top 60%" },
+            y: 100, opacity: 0, scale: 0.85, stagger: 0.16, duration: 1.1, ease: "elastic.out(1, 0.55)"
+        });
+
+        // Animate contact links on scroll
+        gsap.from("#contact .gsap-fade-up", {
+            scrollTrigger: { trigger: "#contact", start: "top 80%" },
+            y: 50, opacity: 0, stagger: 0.15, duration: 0.8, ease: "power3.out"
+        });
+
+
+        // Navbar scroll effect
+        window.addEventListener('scroll', () => {
+            const nav = document.getElementById('navbar');
+            window.scrollY > 50 ? nav.classList.add('nav-scrolled') : nav.classList.remove('nav-scrolled');
+        });
+
+        // Marquee fallback: duplicate marquee content for seamless loop
+        document.querySelectorAll('.animate-marquee').forEach(el => {
+            const clone = el.cloneNode(true);
+            el.parentNode.appendChild(clone);
+        });
+    })();
+
+    /* ===========================================================
+       6) Minor UX polish: reduce animation load on mobile & low-rpi devices
+       =========================================================== */
+    (function perfTuning(){
+        const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+        if (isMobile) {
+            // disable gooey heavy filter on mobile, reduce particles
+            document.querySelectorAll('.ambient-blob').forEach(b => b.style.display = 'none');
+            // lower frame-rate by throttling some loops if desired
+        }
+    })();
+    </script>
+</body>
+</html>
